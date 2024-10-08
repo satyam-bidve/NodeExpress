@@ -1,17 +1,17 @@
 var express = require('express');
 var app = express();
-var bodyParser = require('body-parser');
 app.use(express.static('public'));
 app.use(express.json());
 var path = require('path');  
 const fs = require('fs');
+const Grid = require('gridfs-stream');
+let gfs;
 
-
-const PDFParser = require('pdf-parse');
+//const PDFParser = require('pdf-parse');
 //const uploadDirectory = './uploads';
 const multer = require('multer');
-const mammoth = require('mammoth');
-const pdf = require('html-pdf');
+//const mammoth = require('mammoth');
+//const pdf = require('html-pdf');
 app.use(express.urlencoded({ extended: true }));
 
 const storage = multer.diskStorage({
@@ -29,10 +29,15 @@ if (!fs.existsSync(uploadDirectory)) {
     fs.mkdirSync(uploadDirectory, { recursive: true });
 }
 // database
+
 const mongoose = require('mongoose');
 mongoose.connect('mongodb://localhost/learnNodeDB')
-  .then(() => console.log('Connected to MongoDB'))
-  .catch((err) => console.error('Failed to connect to MongoDB', err));
+.then(() => {
+   console.log('Connected to MongoDB');
+   gfs = Grid(mongoose.connection.db, mongoose.mongo);
+   gfs.collection('uploads');  // Set the collection to store files
+})
+.catch((err) => console.error('Failed to connect to MongoDB', err));
 
 const userSchema = new mongoose.Schema({ 
     name: String ,
@@ -40,6 +45,15 @@ const userSchema = new mongoose.Schema({
     email:String
 });
 const User = mongoose.model('User', userSchema);
+const fileSchema = new mongoose.Schema({
+    filename: String,
+    contentType: String,
+    fileSize: Number,
+    fileData: Buffer,  
+    uploadDate: { type: Date, default: Date.now }
+});
+
+const File = mongoose.model('File', fileSchema);
 
 // example of middelware function -- Logs the URL and method of every request before passing control to the next
 app.use(function (req, res, next) {
@@ -58,30 +72,24 @@ app.post('/uploadFile', upload.single('file'), async (req, res) => {
         const uploadedFile = req.file;
         const fileName = `${uploadedFile.originalname}`;
         const filePath = `${uploadDirectory}/${fileName}`;
-        const fileData = fs.readFileSync(filePath, 'utf8');
-        //await processFileData(fileData);
-
-        // Determine the file type
-        const fileExtension = uploadedFile.mimetype ?uploadedFile.mimetype : null;
-
-        // Check if the file is already in PDF format
-        if (fileExtension === 'application/pdf') {
-            // Process the PDF directly
-            await processPDF(filePath, res);
-        } else {
-            // Convert the file to PDF
-            const convertedFilePath = await convertToPDF(filePath);
-
-            // Process the converted PDF
-            await processPDF(convertedFilePath, res);
-        }
+        const fileData = fs.readFileSync(filePath);
+        const newFile = new File({
+            filename: req.file.originalname,
+            contentType: req.file.mimetype,
+            fileSize: req.file.size,
+            fileData: fileData  
+        });
+        await newFile.save(); 
+        res.status(200).json({ success: true, message: 'File uploaded and saved to database!' });
     } catch (error) {
-         console.error('An error occurred while processing the file:', error);
-         res.status(500).json({ error: 'Failed to process the file' });
+        console.error('An error occurred while processing the file:', error);
+        res.status(500).json({ error: 'Failed to process the file' });
     }
 });
 
+
 app.get('/', function (req, res) {
+    console.log(`id of this process ${process.pid}`);
     res.render('index', { title: 'Home Page register', message: 'register' });
 })
 var profileRouter = require('./profileRouter');

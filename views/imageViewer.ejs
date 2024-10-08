@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Random Image</title>
+</head>
+<body>
+    <h1>Random Image from Database</h1>
+    <div id="image-container">
+        <p>Loading image...</p>
+    </div>
+
+    <script>
+        // Fetch the random image on page load
+        async function loadRandomImage() {
+            try {
+                const response = await fetch('/randomImage');
+                const blob = await response.blob();
+                console.log('Blob object:', blob);
+
+                const imageContainer = document.getElementById('image-container');
+                const image = document.createElement('img');
+
+                // Create an object URL from the blob and set it as the image's src
+                const imageURL = URL.createObjectURL(blob);
+                image.src = imageURL;
+                image.alt = 'Random Image';
+
+                // Append the image to the container
+                imageContainer.innerHTML = '';  // Clear loading message
+                imageContainer.appendChild(image);
+
+                // Optionally: Revoke the object URL once the image is loaded
+                image.onload = () => {
+                    URL.revokeObjectURL(imageURL);  // Free up memory
+                };
+
+            } catch (error) {
+                console.error('Error loading random image:', error);
+                document.getElementById('image-container').innerHTML = 'Failed to load image';
+            }
+        }
+        // Call the function to load the image once the page loads
+        window.onload = loadRandomImage;
+    </script>
+</body>
+</html>

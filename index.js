@@ -86,7 +86,30 @@ app.post('/uploadFile', upload.single('file'), async (req, res) => {
         res.status(500).json({ error: 'Failed to process the file' });
     }
 });
+//----------------------------------------------------- get the randome image
+app.get('/displayImage', (req, res) => {
+    res.render('imageViewer');
+});
 
+app.get('/randomImage', async (req, res) => {
+    try {
+        const randomFile = await File.aggregate([{ $sample: { size: 1 } }]);
+        if (randomFile.length === 0) {
+            return res.status(404).json({ error: 'No images found in the database' });
+        }
+        const file = randomFile[0];
+        res.set({
+            'Content-Type': file.contentType,
+            'Content-Disposition': `inline; filename="${file.filename}"`
+        });
+        res.send(file.fileData);
+    } catch (error) {
+        console.error('Error fetching random file:', error);
+        res.status(500).json({ error: 'Failed to retrieve a random file' });
+    }
+});
+
+//----------------------------------------------------------------------------
 
 app.get('/', function (req, res) {
     console.log(`id of this process ${process.pid}`);
